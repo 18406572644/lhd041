@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Image, Download, Copy, Sparkles } from 'lucide-vue-next';
+import { Image, Download, Copy, Sparkles, Settings, X } from 'lucide-vue-next';
 import type { Hero, Preset, CardPreset } from '../../types';
 import { useHeroStore } from '../../stores/hero';
 import { usePresetsStore } from '../../stores/presets';
@@ -8,6 +8,7 @@ import { useUiStore } from '../../stores/ui';
 import { useCardExport } from '../../composables/useCardExport';
 import { avatars, colorSchemes } from '../../data/appearance';
 import PresetsPanel from './PresetsPanel.vue';
+import CardExportPanel from './CardExportPanel.vue';
 
 const props = defineProps<{
   hero: Hero;
@@ -16,9 +17,10 @@ const props = defineProps<{
 const heroStore = useHeroStore();
 const presetsStore = usePresetsStore();
 const uiStore = useUiStore();
-const { exportAndDownload, copyToClipboard, isExporting } = useCardExport();
+const { copyToClipboard, isExporting } = useCardExport();
 
 const cardRef = ref<HTMLElement | null>(null);
+const showExportPanel = ref(false);
 
 const selectedCardTemplate = computed(() => {
   return heroStore.cardTemplates.find(t => t.id === props.hero.cardTemplate);
@@ -36,24 +38,31 @@ function selectCardTemplate(templateId: string) {
   heroStore.updateCurrentHero({ cardTemplate: templateId });
 }
 
-async function downloadCard() {
-  if (!cardRef.value) return;
-  try {
-    await exportAndDownload(cardRef.value, `${props.hero.name}-card`);
-    uiStore.showSuccess('卡片已下载！');
-  } catch (e) {
-    uiStore.showError('下载失败，请重试');
-  }
-}
-
 async function copyCard() {
   if (!cardRef.value) return;
   try {
-    await copyToClipboard(cardRef.value);
-    uiStore.showSuccess('卡片已复制到剪贴板！');
+    const ok = await copyToClipboard(cardRef.value);
+    if (ok) {
+      uiStore.showSuccess('卡片已复制到剪贴板！');
+    } else {
+      uiStore.showError('复制失败，请重试');
+    }
   } catch (e) {
     uiStore.showError('复制失败，请重试');
   }
+}
+
+function handleExportSuccess(format: string) {
+  if (format === 'clipboard') {
+    uiStore.showSuccess('卡片已复制到剪贴板！');
+  } else {
+    uiStore.showSuccess(`${format.toUpperCase()} 卡片已下载！`);
+    showExportPanel.value = false;
+  }
+}
+
+function handleExportError(msg: string) {
+  uiStore.showError(msg);
 }
 
 function handleSavePreset(name: string) {
@@ -119,13 +128,24 @@ function handleApplyPreset(preset: Preset) {
             <button 
               class="action-btn download"
               :disabled="isExporting"
-              @click="downloadCard"
+              @click="showExportPanel = !showExportPanel"
             >
-              <Download :size="16" />
-              <span>{{ isExporting ? '导出中...' : '下载' }}</span>
+              <component :is="showExportPanel ? X : Download" :size="16" />
+              <span>{{ showExportPanel ? '收起' : '导出' }}</span>
             </button>
           </div>
         </div>
+
+        <CardExportPanel
+          v-if="showExportPanel"
+          :card-element="cardRef"
+          :hero-name="hero.name"
+          :visible="showExportPanel"
+          @close="showExportPanel = false"
+          @success="handleExportSuccess"
+          @error="handleExportError"
+          style="margin-bottom: 16px;"
+        />
         
         <div class="card-wrapper">
           <div 

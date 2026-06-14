@@ -4,12 +4,13 @@ import { useRouter } from 'vue-router';
 import {
   Heart, Plus, Trash2, Share2, Settings, X, Check,
   FolderPlus, Edit3, GripVertical, ChevronDown, ChevronRight,
-  Move, CheckSquare, Square
+  Move, CheckSquare, Square, Download
 } from 'lucide-vue-next';
 import { useHeroStore } from '../stores/hero';
 import { useUiStore } from '../stores/ui';
 import HeroCard from '../components/hero/HeroCard.vue';
-import type { FavoriteFolder } from '../types';
+import BatchExportDialog from '../components/hero/BatchExportDialog.vue';
+import type { FavoriteFolder, Hero } from '../types';
 
 const router = useRouter();
 const heroStore = useHeroStore();
@@ -24,6 +25,7 @@ const expandedFolders = ref<Set<string>>(new Set());
 const showManageDialog = ref(false);
 const showCreateDialog = ref(false);
 const showMoveDialog = ref(false);
+const showBatchExportDialog = ref(false);
 const batchMode = ref(false);
 const selectedHeroIds = ref<Set<string>>(new Set());
 
@@ -236,6 +238,18 @@ function batchMove() {
   batchMode.value = false;
 }
 
+const selectedHeroesForExport = computed<Hero[]>(() => {
+  return savedHeroes.value.filter(h => selectedHeroIds.value.has(h.id));
+});
+
+function openBatchExport() {
+  if (selectedHeroIds.value.size === 0) {
+    uiStore.showWarning('请先选择要导出的英雄');
+    return;
+  }
+  showBatchExportDialog.value = true;
+}
+
 function batchDelete() {
   if (selectedHeroIds.value.size === 0) {
     uiStore.showWarning('请先选择要删除的英雄');
@@ -368,6 +382,10 @@ function onDropFolder(e: DragEvent, toIndex: number) {
       <button class="batch-btn move" @click="openMoveDialog">
         <Move :size="16" />
         <span>移动到...</span>
+      </button>
+      <button class="batch-btn export" @click="openBatchExport">
+        <Download :size="16" />
+        <span>批量导出</span>
       </button>
       <button class="batch-btn delete" @click="batchDelete">
         <Trash2 :size="16" />
@@ -727,6 +745,12 @@ function onDropFolder(e: DragEvent, toIndex: number) {
         </div>
       </div>
     </Teleport>
+
+    <BatchExportDialog
+      :visible="showBatchExportDialog"
+      :heroes="selectedHeroesForExport"
+      @close="showBatchExportDialog = false"
+    />
   </div>
 </template>
 
@@ -900,6 +924,11 @@ function onDropFolder(e: DragEvent, toIndex: number) {
 
 .batch-btn.move {
   background: #2196f3;
+  color: #fafafa;
+}
+
+.batch-btn.export {
+  background: #4caf50;
   color: #fafafa;
 }
 
