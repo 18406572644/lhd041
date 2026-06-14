@@ -28,6 +28,12 @@ const router = createRouter({
       meta: { title: '热门英雄 - 超级英雄角色生成器' }
     },
     {
+      path: '/universe',
+      name: 'universe',
+      component: () => import('../pages/UniversePage.vue'),
+      meta: { title: '角色宇宙 - 超级英雄角色生成器' }
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/'
     }

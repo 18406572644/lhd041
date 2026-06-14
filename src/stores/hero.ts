@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Hero, HeroWithRank, Power, CardTemplate, ComicEffect, Appearance, Stats, FavoriteFolder, ArtStyle, PortraitConfig } from '../types';
+import type { Hero, HeroWithRank, Power, CardTemplate, ComicEffect, Appearance, Stats, FavoriteFolder, ArtStyle, PortraitConfig, HeroRelation, RelationType, UniverseStorageData, RelationTypeConfig } from '../types';
 import { getHeroTemplates, getHotHeroes, getPowers, getCardTemplates, likeHero as apiLikeHero, shareHero as apiShareHero } from '../utils/mockApi';
 import { generateId, randomPick, randomPickN, randomInt } from '../utils/random';
 import { generateBackstory } from '../utils/storyGenerator';
@@ -11,6 +11,18 @@ import { ART_STYLES, createDefaultPortraitConfig } from '../data/portraitAssets'
 const STORAGE_KEY = 'comic-hero-collection';
 const DATA_VERSION = '2.0';
 const DEFAULT_FOLDER_ID = 'default';
+
+const UNIVERSE_STORAGE_KEY = 'comic-hero-universe';
+const UNIVERSE_DATA_VERSION = '1.0';
+
+export const RELATION_TYPES: RelationTypeConfig[] = [
+  { id: 'ally', label: '盟友', icon: '🤝', color: '#4caf50' },
+  { id: 'enemy', label: '敌人', icon: '⚔️', color: '#e53935' },
+  { id: 'mentor', label: '师徒', icon: '📚', color: '#2196f3' },
+  { id: 'family', label: '家人', icon: '👨‍👩‍👧', color: '#ff9800' },
+  { id: 'lover', label: '恋人', icon: '💘', color: '#e91e63' },
+  { id: 'rival', label: '竞争对手', icon: '🏆', color: '#9c27b0' }
+];
 
 interface StorageData {
   version: string;
@@ -181,8 +193,38 @@ function generateRandomPowers(): Power[] {
   return randomPickN(availablePowers, randomInt(2, 4));
 }
 
+function initializeUniverseStorage(): UniverseStorageData {
+  try {
+    const existing = localStorage.getItem(UNIVERSE_STORAGE_KEY);
+    if (existing) {
+      const parsed = JSON.parse(existing);
+      if (parsed.version === UNIVERSE_DATA_VERSION) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Universe storage init error:', e);
+  }
+  return {
+    version: UNIVERSE_DATA_VERSION,
+    relations: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function saveUniverseToStorage(data: UniverseStorageData) {
+  try {
+    data.updatedAt = new Date().toISOString();
+    localStorage.setItem(UNIVERSE_STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('Universe storage save error:', e);
+  }
+}
+
 export const useHeroStore = defineStore('hero', () => {
   const storageData = ref<StorageData>(initializeStorage());
+  const universeData = ref<UniverseStorageData>(initializeUniverseStorage());
   const currentHero = ref<Hero | null>(null);
   const isGenerating = ref(false);
 
@@ -199,6 +241,7 @@ export const useHeroStore = defineStore('hero', () => {
   const isSaving = ref(false);
 
   const savedHeroes = computed(() => storageData.value.heroes);
+  const relations = computed(() => universeData.value.relations);
   const folders = computed(() => 
     [...storageData.value.folders].sort((a, b) => a.order - b.order)
   );
@@ -637,6 +680,77 @@ export const useHeroStore = defineStore('hero', () => {
     return likeHeroById(heroId);
   }
 
+  function getRelationById(relationId: string): HeroRelation | undefined {
+    return universeData.value.relations.find(r => r.id === relationId);
+  }
+
+  function getRelationsForHero(heroId: string): HeroRelation[] {
+    return universeData.value.relations.filter(
+      r => r.sourceId === heroId || r.targetId === heroId
+    );
+  }
+
+  function getRelationBetween(sourceId: string, targetId: string): HeroRelation | undefined {
+    return universeData.value.relations.find(
+      r => (r.sourceId === sourceId && r.targetId === targetId) ||
+           (r.sourceId === targetId && r.targetId === sourceId)
+    );
+  }
+
+  function addRelation(sourceId: string, targetId: string, type: RelationType, description: string = ''): HeroRelation | null {
+    if (sourceId === targetId) return null;
+    if (getRelationBetween(sourceId, targetId)) return null;
+
+    const newRelation: HeroRelation = {
+      id: `rel-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      sourceId,
+      targetId,
+      type,
+      description: description.trim(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    universeData.value.relations.push(newRelation);
+    saveUniverseToStorage(universeData.value);
+    return newRelation;
+  }
+
+  function updateRelation(relationId: string, updates: Partial<Omit<HeroRelation, 'id' | 'sourceId' | 'targetId' | 'createdAt'>>): boolean {
+    const relation = getRelationById(relationId);
+    if (!relation) return false;
+    Object.assign(relation, updates, { updatedAt: new Date().toISOString() });
+    saveUniverseToStorage(universeData.value);
+    return true;
+  }
+
+  function removeRelation(relationId: string): boolean {
+    const initialLength = universeData.value.relations.length;
+    universeData.value.relations = universeData.value.relations.filter(r => r.id !== relationId);
+    if (universeData.value.relations.length < initialLength) {
+      saveUniverseToStorage(universeData.value);
+      return true;
+    }
+    return false;
+  }
+
+  function removeRelationsForHero(heroId: string): number {
+    const initialLength = universeData.value.relations.length;
+    universeData.value.relations = universeData.value.relations.filter(
+      r => r.sourceId !== heroId && r.targetId !== heroId
+    );
+    const removed = initialLength - universeData.value.relations.length;
+    if (removed > 0) {
+      saveUniverseToStorage(universeData.value);
+    }
+    return removed;
+  }
+
+  function clearAllRelations(): boolean {
+    universeData.value.relations = [];
+    saveUniverseToStorage(universeData.value);
+    return true;
+  }
+
   return {
     currentHero,
     isGenerating,
@@ -645,6 +759,7 @@ export const useHeroStore = defineStore('hero', () => {
     powers,
     cardTemplates,
     savedHeroes,
+    relations,
     folders,
     defaultFolder,
     isLoadingTemplates,
@@ -691,6 +806,14 @@ export const useHeroStore = defineStore('hero', () => {
     reorderFolders,
     moveHeroToFolder,
     moveHeroesToFolder,
-    reorderHeroesInFolder
+    reorderHeroesInFolder,
+    getRelationById,
+    getRelationsForHero,
+    getRelationBetween,
+    addRelation,
+    updateRelation,
+    removeRelation,
+    removeRelationsForHero,
+    clearAllRelations
   };
 });

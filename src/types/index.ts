@@ -227,3 +227,53 @@ export interface PresetsStorageData {
 }
 
 export type SortMode = 'date' | 'usage' | 'name';
+
+export type RelationType = 'ally' | 'enemy' | 'mentor' | 'family' | 'lover' | 'rival';
+
+export interface RelationTypeConfig {
+  id: RelationType;
+  label: string;
+  icon: string;
+  color: string;
+  dashPattern?: string;
+}
+
+export interface HeroRelation {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  type: RelationType;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UniverseStorageData {
+  version: string;
+  relations: HeroRelation[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type LayoutMode = 'force' | 'circle' | 'tree';
+
+export interface GraphNode {
+  id: string;
+  hero: Hero;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  fx?: number | null;
+  fy?: number | null;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: GraphNode;
+  target: GraphNode;
+  sourceId: string;
+  targetId: string;
+  type: RelationType;
+  description: string;
+}

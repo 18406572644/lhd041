@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router';
-import { Home, Sparkles, Heart, TrendingUp, Menu, X } from 'lucide-vue-next';
+import { Home, Sparkles, Heart, TrendingUp, Menu, X, Network } from 'lucide-vue-next';
 import { useUiStore } from '../../stores/ui';
 
 const router = useRouter();
@@ -10,6 +10,7 @@ const uiStore = useUiStore();
 const navItems = [
   { path: '/', label: '首页', icon: Home },
   { path: '/generator', label: '角色生成', icon: Sparkles },
+  { path: '/universe', label: '角色宇宙', icon: Network },
   { path: '/favorites', label: '我的收藏', icon: Heart },
   { path: '/hot', label: '热门英雄', icon: TrendingUp }
 ];
