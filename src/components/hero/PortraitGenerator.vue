@@ -60,6 +60,18 @@ function onCustomImageConfirm(data: { image?: string; filter: ImageFilterSetting
   emit('update:modelValue', generator.currentConfig.value);
 }
 
+function onCustomImageUpdate(image?: string) {
+  generator.setCustomImage(image, undefined);
+  emit('update:modelValue', generator.currentConfig.value);
+}
+
+function onCustomFilterUpdate(filter: ImageFilterSettings) {
+  if (generator.currentConfig.value.customImage) {
+    generator.applyConfigToCurrent({ imageFilter: filter });
+    emit('update:modelValue', generator.currentConfig.value);
+  }
+}
+
 function handleSaveTemplate() {
   if (!saveTemplateName.value.trim()) return;
   const tpl = portraitTemplates.saveTemplate(saveTemplateName.value, generator.currentConfig.value);
@@ -168,6 +180,8 @@ function openSaveDialog() {
         <CustomImageUploader
           :model-value="currentConfig.customImage"
           :initial-filter="currentConfig.imageFilter"
+          @update:model-value="onCustomImageUpdate"
+          @update:filter="onCustomFilterUpdate"
           @confirm="onCustomImageConfirm"
         />
       </div>

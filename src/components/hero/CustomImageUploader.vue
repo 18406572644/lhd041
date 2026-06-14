@@ -3,6 +3,8 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import type { ImageFilterSettings } from '../../types';
 import { DEFAULT_FILTER, FILTER_PRESETS } from '../../data/portraitAssets';
 
+type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | null;
+
 const props = withDefaults(defineProps<{
   modelValue?: string;
   initialFilter?: ImageFilterSettings;
@@ -24,8 +26,13 @@ const cropCanvas = ref<HTMLCanvasElement | null>(null);
 const filter = ref<ImageFilterSettings>({ ...DEFAULT_FILTER });
 const cropInfo = ref({ x: 0, y: 0, w: 0, h: 0 });
 const isDragging = ref(false);
+const isResizing = ref(false);
+const activeHandle = ref<ResizeHandle>(null);
 const dragStart = ref({ x: 0, y: 0 });
+const startCrop = ref({ x: 0, y: 0, w: 0, h: 0 });
 const loadedImage = ref<HTMLImageElement | null>(null);
+
+const MIN_CROP_SIZE = 20;
 
 const filterStyle = computed(() => {
   const f = filter.value;
@@ -36,7 +43,7 @@ const filterStyle = computed(() => {
   if (f.contrast !== 100) filters.push(`contrast(${f.contrast}%)`);
   if (f.saturation !== 100) filters.push(`saturate(${f.saturation}%)`);
   if (f.blur > 0) filters.push(`blur(${f.blur}px)`);
-  return filters.join(' ');
+  return filters.join(' ') || 'none';
 });
 
 watch(() => props.initialFilter, (val) => {
@@ -51,6 +58,11 @@ watch(() => props.modelValue, (val) => {
     loadImageFromSrc(val);
   }
 }, { immediate: true });
+
+watch(filter, () => {
+  drawPreview();
+  emit('update:filter', { ...filter.value });
+}, { deep: true });
 
 function loadImageFromSrc(src: string) {
   const img = new Image();
@@ -87,6 +99,56 @@ function initCropInfo(imgWidth: number, imgHeight: number) {
   };
 }
 
+function getHandleAtPosition(canvasX: number, canvasY: number): ResizeHandle {
+  if (!loadedImage.value) return null;
+
+  const canvasSize = 300;
+  const scale = canvasSize / Math.max(loadedImage.value.width, loadedImage.value.height);
+  const drawW = loadedImage.value.width * scale;
+  const drawH = loadedImage.value.height * scale;
+  const offsetX = (canvasSize - drawW) / 2;
+  const offsetY = (canvasSize - drawH) / 2;
+
+  const cropX = offsetX + cropInfo.value.x * scale;
+  const cropY = offsetY + cropInfo.value.y * scale;
+  const cropW = cropInfo.value.w * scale;
+  const cropH = cropInfo.value.h * scale;
+
+  const handleSize = 14;
+
+  if (canvasX >= cropX - handleSize / 2 && canvasX <= cropX + handleSize / 2 &&
+      canvasY >= cropY - handleSize / 2 && canvasY <= cropY + handleSize / 2) return 'nw';
+  if (canvasX >= cropX + cropW - handleSize / 2 && canvasX <= cropX + cropW + handleSize / 2 &&
+      canvasY >= cropY - handleSize / 2 && canvasY <= cropY + handleSize / 2) return 'ne';
+  if (canvasX >= cropX + cropW - handleSize / 2 && canvasX <= cropX + cropW + handleSize / 2 &&
+      canvasY >= cropY + cropH - handleSize / 2 && canvasY <= cropY + cropH + handleSize / 2) return 'se';
+  if (canvasX >= cropX - handleSize / 2 && canvasX <= cropX + handleSize / 2 &&
+      canvasY >= cropY + cropH - handleSize / 2 && canvasY <= cropY + cropH + handleSize / 2) return 'sw';
+  if (canvasX >= cropX + cropW / 2 - handleSize / 2 && canvasX <= cropX + cropW / 2 + handleSize / 2 &&
+      canvasY >= cropY - handleSize / 2 && canvasY <= cropY + handleSize / 2) return 'n';
+  if (canvasX >= cropX + cropW - handleSize / 2 && canvasX <= cropX + cropW + handleSize / 2 &&
+      canvasY >= cropY + cropH / 2 - handleSize / 2 && canvasY <= cropY + cropH / 2 + handleSize / 2) return 'e';
+  if (canvasX >= cropX + cropW / 2 - handleSize / 2 && canvasX <= cropX + cropW / 2 + handleSize / 2 &&
+      canvasY >= cropY + cropH - handleSize / 2 && canvasY <= cropY + cropH + handleSize / 2) return 's';
+  if (canvasX >= cropX - handleSize / 2 && canvasX <= cropX + handleSize / 2 &&
+      canvasY >= cropY + cropH / 2 - handleSize / 2 && canvasY <= cropY + cropH / 2 + handleSize / 2) return 'w';
+
+  if (canvasX >= cropX && canvasX <= cropX + cropW &&
+      canvasY >= cropY && canvasY <= cropY + cropH) return null;
+
+  return null;
+}
+
+function getCanvasCoords(e: MouseEvent): { x: number; y: number } {
+  const canvas = previewCanvas.value;
+  if (!canvas) return { x: 0, y: 0 };
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width / rect.width),
+    y: (e.clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+
 function drawPreview() {
   const canvas = previewCanvas.value;
   const img = loadedImage.value;
@@ -105,19 +167,28 @@ function drawPreview() {
   const offsetX = (canvasSize - drawW) / 2;
   const offsetY = (canvasSize - drawH) / 2;
 
-  ctx.clearRect(0, 0, canvasSize, canvasSize);
-  ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
-
   const cropX = offsetX + cropInfo.value.x * scale;
   const cropY = offsetY + cropInfo.value.y * scale;
   const cropW = cropInfo.value.w * scale;
   const cropH = cropInfo.value.h * scale;
 
+  ctx.clearRect(0, 0, canvasSize, canvasSize);
+  ctx.save();
+  ctx.filter = filterStyle.value;
+  ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+  ctx.restore();
+
   ctx.save();
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
   ctx.fillRect(0, 0, canvasSize, canvasSize);
   ctx.clearRect(cropX, cropY, cropW, cropH);
+  ctx.save();
+  ctx.filter = filterStyle.value;
+  ctx.beginPath();
+  ctx.rect(cropX, cropY, cropW, cropH);
+  ctx.clip();
   ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+  ctx.restore();
   ctx.restore();
 
   ctx.strokeStyle = '#FFD54F';
@@ -138,17 +209,50 @@ function drawPreview() {
   ctx.moveTo(cropX, cropY + (cropH * 2) / 3);
   ctx.lineTo(cropX + cropW, cropY + (cropH * 2) / 3);
   ctx.stroke();
+
+  const handleSize = 14;
+  const handleFill = '#FFD54F';
+  const handleStroke = '#212121';
+  ctx.fillStyle = handleFill;
+  ctx.strokeStyle = handleStroke;
+  ctx.lineWidth = 2;
+  const handles = [
+    { x: cropX, y: cropY },
+    { x: cropX + cropW / 2, y: cropY },
+    { x: cropX + cropW, y: cropY },
+    { x: cropX + cropW, y: cropY + cropH / 2 },
+    { x: cropX + cropW, y: cropY + cropH },
+    { x: cropX + cropW / 2, y: cropY + cropH },
+    { x: cropX, y: cropY + cropH },
+    { x: cropX, y: cropY + cropH / 2 }
+  ];
+  handles.forEach(h => {
+    ctx.fillRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+    ctx.strokeRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+  });
 }
 
 function startDrag(e: MouseEvent) {
   if (!loadedImage.value) return;
-  isDragging.value = true;
+  const coords = getCanvasCoords(e);
+  const handle = getHandleAtPosition(coords.x, coords.y);
+
   dragStart.value = { x: e.clientX, y: e.clientY };
+  startCrop.value = { ...cropInfo.value };
+
+  if (handle !== null) {
+    isResizing.value = true;
+    activeHandle.value = handle;
+  } else {
+    isDragging.value = true;
+    activeHandle.value = null;
+  }
   drawPreview();
 }
 
 function onDrag(e: MouseEvent) {
-  if (!isDragging.value || !loadedImage.value) return;
+  if (!isDragging.value && !isResizing.value) return;
+  if (!loadedImage.value) return;
 
   const canvas = previewCanvas.value;
   if (!canvas) return;
@@ -159,22 +263,65 @@ function onDrag(e: MouseEvent) {
   const dx = (e.clientX - dragStart.value.x) / scale;
   const dy = (e.clientY - dragStart.value.y) / scale;
 
-  dragStart.value = { x: e.clientX, y: e.clientY };
+  if (isDragging.value) {
+    let newX = startCrop.value.x + dx;
+    let newY = startCrop.value.y + dy;
+    newX = Math.max(0, Math.min(newX, loadedImage.value.width - cropInfo.value.w));
+    newY = Math.max(0, Math.min(newY, loadedImage.value.height - cropInfo.value.h));
+    cropInfo.value.x = newX;
+    cropInfo.value.y = newY;
+  } else if (isResizing.value && activeHandle.value) {
+    let { x, y, w, h } = startCrop.value;
+    const imgW = loadedImage.value.width;
+    const imgH = loadedImage.value.height;
 
-  let newX = cropInfo.value.x + dx;
-  let newY = cropInfo.value.y + dy;
+    switch (activeHandle.value) {
+      case 'nw':
+        x = Math.max(0, Math.min(startCrop.value.x + dx, startCrop.value.x + startCrop.value.w - MIN_CROP_SIZE));
+        y = Math.max(0, Math.min(startCrop.value.y + dy, startCrop.value.y + startCrop.value.h - MIN_CROP_SIZE));
+        w = startCrop.value.w - (x - startCrop.value.x);
+        h = startCrop.value.h - (y - startCrop.value.y);
+        break;
+      case 'n':
+        y = Math.max(0, Math.min(startCrop.value.y + dy, startCrop.value.y + startCrop.value.h - MIN_CROP_SIZE));
+        h = startCrop.value.h - (y - startCrop.value.y);
+        break;
+      case 'ne':
+        y = Math.max(0, Math.min(startCrop.value.y + dy, startCrop.value.y + startCrop.value.h - MIN_CROP_SIZE));
+        w = Math.max(MIN_CROP_SIZE, Math.min(startCrop.value.w + dx, imgW - startCrop.value.x));
+        h = startCrop.value.h - (y - startCrop.value.y);
+        break;
+      case 'e':
+        w = Math.max(MIN_CROP_SIZE, Math.min(startCrop.value.w + dx, imgW - startCrop.value.x));
+        break;
+      case 'se':
+        w = Math.max(MIN_CROP_SIZE, Math.min(startCrop.value.w + dx, imgW - startCrop.value.x));
+        h = Math.max(MIN_CROP_SIZE, Math.min(startCrop.value.h + dy, imgH - startCrop.value.y));
+        break;
+      case 's':
+        h = Math.max(MIN_CROP_SIZE, Math.min(startCrop.value.h + dy, imgH - startCrop.value.y));
+        break;
+      case 'sw':
+        x = Math.max(0, Math.min(startCrop.value.x + dx, startCrop.value.x + startCrop.value.w - MIN_CROP_SIZE));
+        w = startCrop.value.w - (x - startCrop.value.x);
+        h = Math.max(MIN_CROP_SIZE, Math.min(startCrop.value.h + dy, imgH - startCrop.value.y));
+        break;
+      case 'w':
+        x = Math.max(0, Math.min(startCrop.value.x + dx, startCrop.value.x + startCrop.value.w - MIN_CROP_SIZE));
+        w = startCrop.value.w - (x - startCrop.value.x);
+        break;
+    }
 
-  newX = Math.max(0, Math.min(newX, loadedImage.value.width - cropInfo.value.w));
-  newY = Math.max(0, Math.min(newY, loadedImage.value.height - cropInfo.value.h));
-
-  cropInfo.value.x = newX;
-  cropInfo.value.y = newY;
+    cropInfo.value = { x, y, w, h };
+  }
 
   drawPreview();
 }
 
 function endDrag() {
   isDragging.value = false;
+  isResizing.value = false;
+  activeHandle.value = null;
 }
 
 function applyFilter(): string | undefined {
@@ -210,13 +357,13 @@ function setPreset(presetKey: number) {
   const preset = FILTER_PRESETS[presetKey];
   if (preset) {
     filter.value = { ...preset.filter };
-    emit('update:filter', filter.value);
   }
 }
 
 function resetFilter() {
   filter.value = { ...DEFAULT_FILTER };
   emit('update:filter', filter.value);
+  drawPreview();
 }
 
 function confirmImage() {
@@ -229,12 +376,14 @@ function clearImage() {
   imageSrc.value = '';
   loadedImage.value = null;
   cropInfo.value = { x: 0, y: 0, w: 0, h: 0 };
+  filter.value = { ...DEFAULT_FILTER };
+  isDragging.value = false;
+  isResizing.value = false;
+  activeHandle.value = null;
+  if (file.value) file.value.value = '';
   emit('update:modelValue', undefined);
+  emit('update:filter', { ...DEFAULT_FILTER });
 }
-
-watch(filter, (val) => {
-  emit('update:filter', { ...val });
-}, { deep: true });
 
 onMounted(() => {
   if (props.modelValue) {
@@ -255,7 +404,7 @@ onMounted(() => {
       />
       <div class="upload-icon">📷</div>
       <div class="upload-text">点击上传图片</div>
-      <div class="upload-hint">支持 JPG、PNG、GIF 等格式</div>
+      <div class="upload-hint">支持 JPG、PNG、GIF 等格式，支持裁剪缩放和滤镜</div>
     </div>
 
     <template v-else>
@@ -265,12 +414,15 @@ onMounted(() => {
           class="preview-canvas"
           width="300"
           height="300"
+          :style="{ cursor: isResizing ? (activeHandle || 'nw-resize') : (isDragging ? 'grabbing' : 'grab') }"
           @mousedown="startDrag"
           @mousemove="onDrag"
           @mouseup="endDrag"
           @mouseleave="endDrag"
         ></canvas>
       </div>
+
+      <div class="tip-text">💡 拖动裁剪框移动，拖动四角/四边的黄色方块调整大小</div>
 
       <canvas ref="cropCanvas" style="display: none"></canvas>
 
@@ -444,8 +596,19 @@ onMounted(() => {
   border: 3px solid #212121;
   box-shadow: 4px 4px 0 #212121;
   border-radius: 4px;
-  cursor: move;
   background: #FFFFFF;
+  user-select: none;
+}
+
+.tip-text {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1565C0;
+  padding: 6px 10px;
+  background: #E3F2FD;
+  border: 2px solid #1565C0;
+  border-radius: 4px;
 }
 
 .section-title {
