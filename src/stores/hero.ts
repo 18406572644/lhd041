@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Hero, HeroWithRank, Power, CardTemplate, ComicEffect, Appearance, Stats, FavoriteFolder } from '../types';
+import type { Hero, HeroWithRank, Power, CardTemplate, ComicEffect, Appearance, Stats, FavoriteFolder, ArtStyle, PortraitConfig } from '../types';
 import { getHeroTemplates, getHotHeroes, getPowers, getCardTemplates, likeHero as apiLikeHero, shareHero as apiShareHero } from '../utils/mockApi';
 import { generateId, randomPick, randomPickN, randomInt } from '../utils/random';
 import { generateBackstory } from '../utils/storyGenerator';
 import { heroNames, realNames, catchphrases, weaknesses } from '../data/powers';
 import { avatars, costumes, colorSchemes, accessories, bodyTypes, hairStyles, eyeStyles } from '../data/appearance';
+import { ART_STYLES, createDefaultPortraitConfig } from '../data/portraitAssets';
 
 const STORAGE_KEY = 'comic-hero-collection';
 const DATA_VERSION = '2.0';
@@ -95,7 +96,8 @@ function createEmptyHero(): Hero {
       accessories: [],
       bodyType: bodyTypes[0].id,
       hairStyle: hairStyles[0].id,
-      eyeStyle: eyeStyles[0].id
+      eyeStyle: eyeStyles[0].id,
+      portrait: createDefaultPortraitConfig()
     },
     powers: [],
     stats: { ...defaultStats },
@@ -110,14 +112,29 @@ function createEmptyHero(): Hero {
 }
 
 function generateRandomAppearance(): Appearance {
+  const artStyleIds = ART_STYLES.map(s => s.id);
+  const randomStyle = randomPick(artStyleIds) as ArtStyle;
+  const bodyShapeMap: Record<string, any> = {};
+  bodyTypes.forEach((b: any) => { bodyShapeMap[b.id] = b.id === 'athletic' ? 'athletic' : b.id === 'muscular' ? 'muscular' : b.id === 'large' ? 'large' : b.id === 'robotic' ? 'robotic' : 'slim'; });
+  const randomBodyType = randomPick(bodyTypes).id;
+  const bodyShape = bodyShapeMap[randomBodyType] || 'athletic';
+
+  const cfg: PortraitConfig = {
+    ...createDefaultPortraitConfig(),
+    artStyle: randomStyle,
+    bodyShape: bodyShape as PortraitConfig['bodyShape'],
+    genderBias: randomPick(['masculine', 'feminine', 'neutral']) as PortraitConfig['genderBias']
+  };
+
   return {
     avatar: randomPick(avatars).id,
     costume: randomPick(costumes).id,
     colorScheme: randomPick(colorSchemes).id,
     accessories: randomPickN(accessories, randomInt(1, 4)).map(a => a.id),
-    bodyType: randomPick(bodyTypes).id,
+    bodyType: randomBodyType,
     hairStyle: randomPick(hairStyles).id,
-    eyeStyle: randomPick(eyeStyles).id
+    eyeStyle: randomPick(eyeStyles).id,
+    portrait: cfg
   };
 }
 

@@ -6,6 +6,9 @@ import { colorSchemes, avatars } from '../../data/appearance';
 import { useHeroStore } from '../../stores/hero';
 import { useUiStore } from '../../stores/ui';
 import { useRouter } from 'vue-router';
+import CharacterPortrait from './CharacterPortrait.vue';
+import { createDefaultPortraitConfig } from '../../data/portraitAssets';
+import type { PortraitConfig } from '../../types';
 
 const props = defineProps<{
   hero: Hero;
@@ -32,6 +35,13 @@ const colorScheme = computed(() => {
 const avatarEmoji = computed(() => {
   const avatar = avatars.find(a => a.id === props.hero.appearance.avatar);
   return avatar?.emoji || '🦸';
+});
+
+const portraitConfig = computed<PortraitConfig>(() => {
+  if (props.hero.appearance.portrait) {
+    return props.hero.appearance.portrait;
+  }
+  return createDefaultPortraitConfig();
 });
 
 const statTotal = computed(() => {
@@ -213,8 +223,10 @@ function handleShare() {
   flex-shrink: 0;
 }
 
-.hero-avatar {
-  font-size: 36px;
+.hero-portrait {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
 }
 
 .hero-info {

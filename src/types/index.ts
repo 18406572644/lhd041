@@ -1,3 +1,70 @@
+export type ArtStyle = 'pixel' | 'comic' | 'anime' | 'cyberpunk' | 'realistic';
+
+export interface PortraitColors {
+  skin: string;
+  hair: string;
+  eyes: string;
+  primary: string;
+  secondary: string;
+  accent: string;
+}
+
+export interface PortraitConfig {
+  artStyle: ArtStyle;
+  bodyShape: 'slim' | 'athletic' | 'muscular' | 'large' | 'robotic';
+  genderBias: 'masculine' | 'feminine' | 'neutral';
+  hair: {
+    styleId: string;
+    color: string;
+  };
+  eyes: {
+    styleId: string;
+    color: string;
+  };
+  costume: {
+    styleId: string;
+    primaryColor: string;
+    secondaryColor: string;
+  };
+  accessories: string[];
+  customImage?: string;
+  imageFilter?: ImageFilterSettings;
+}
+
+export interface ImageFilterSettings {
+  grayscale: number;
+  sepia: number;
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  blur: number;
+}
+
+export interface CropSettings {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PortraitTemplate {
+  id: string;
+  name: string;
+  thumbnail?: string;
+  config: PortraitConfig;
+  usageCount: number;
+  isPinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PortraitTemplateStorage {
+  version: string;
+  templates: PortraitTemplate[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Appearance {
   avatar: string;
   costume: string;
@@ -6,6 +73,7 @@ export interface Appearance {
   bodyType: string;
   hairStyle: string;
   eyeStyle: string;
+  portrait: PortraitConfig;
 }
 
 export interface Power {

@@ -7,6 +7,10 @@ import { useHeroStore } from '../../stores/hero';
 import { usePresetsStore } from '../../stores/presets';
 import { useUiStore } from '../../stores/ui';
 import PresetsPanel from './PresetsPanel.vue';
+import CharacterPortrait from './CharacterPortrait.vue';
+import PortraitGenerator from './PortraitGenerator.vue';
+import { createDefaultPortraitConfig } from '../../data/portraitAssets';
+import type { PortraitConfig } from '../../types';
 
 const props = defineProps<{
   hero: Hero;
@@ -19,6 +23,19 @@ const uiStore = useUiStore();
 const selectedColorScheme = computed(() => {
   return colorSchemes.find(c => c.id === props.hero.appearance.colorScheme);
 });
+
+const portraitConfig = computed<PortraitConfig>(() => {
+  return props.hero.appearance.portrait || createDefaultPortraitConfig();
+});
+
+function updatePortrait(newConfig: PortraitConfig) {
+  heroStore.updateCurrentHero({
+    appearance: {
+      ...props.hero.appearance,
+      portrait: newConfig
+    }
+  });
+}
 
 function updateAppearance(key: keyof typeof props.hero.appearance, value: any) {
   heroStore.updateCurrentHero({
@@ -67,6 +84,28 @@ function handleApplyPreset(preset: Preset) {
       <Palette :size="20" />
       <span>外观编辑</span>
     </div>
+
+    <div class="portrait-section">
+      <div class="portrait-preview">
+        <CharacterPortrait
+          :config="portraitConfig"
+          size="large"
+          show-background
+        />
+      </div>
+      <div class="portrait-info">
+        <h3 class="portrait-title">🎨 角色立绘</h3>
+        <p class="portrait-desc">点击下方展开详细立绘生成器，可随机生成候选、手动微调、上传自定义图片或保存为模板</p>
+      </div>
+    </div>
+
+    <PortraitGenerator
+      v-model="portraitConfig"
+      :hero-name="hero.name"
+      class="portrait-generator"
+      @update:model-value="updatePortrait"
+      @confirm="updatePortrait"
+    />
     
     <div class="editor-grid">
       <div class="editor-section">
@@ -408,6 +447,57 @@ select:focus {
   font-size: 10px;
   font-weight: 600;
   text-align: center;
+}
+
+.portrait-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, #fff9c4 0%, #ffe082 100%);
+  border: 4px solid #212121;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 4px 4px 0 #212121;
+}
+
+.portrait-preview {
+  flex-shrink: 0;
+}
+
+.portrait-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.portrait-title {
+  font-family: 'Bangers', cursive;
+  font-size: 22px;
+  color: #e53935;
+  text-shadow: 2px 2px 0 #212121;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.portrait-desc {
+  font-family: 'Comic Neue', cursive;
+  font-size: 13px;
+  color: #424242;
+  margin: 0;
+  font-weight: 600;
+}
+
+.portrait-generator {
+  margin-bottom: 20px;
+}
+
+@media (max-width: 640px) {
+  .portrait-section {
+    flex-direction: column;
+    text-align: center;
+  }
 }
 
 @media (max-width: 768px) {

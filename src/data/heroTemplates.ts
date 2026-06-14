@@ -1,4 +1,5 @@
 import type { Hero } from '../types';
+import { createDefaultPortraitConfig } from './portraitAssets';
 
 export const heroTemplates: Hero[] = [
   {
@@ -13,7 +14,8 @@ export const heroTemplates: Hero[] = [
       accessories: ['mask', 'cape', 'belt'],
       bodyType: 'muscular',
       hairStyle: 'spiky',
-      eyeStyle: 'glowing'
+      eyeStyle: 'glowing',
+      portrait: createDefaultPortraitConfig()
     },
     powers: [
       { id: 'lightning', name: '雷电操控', icon: '⚡', description: '可以操控雷电进行攻击', level: 85 },
@@ -48,7 +50,8 @@ export const heroTemplates: Hero[] = [
       accessories: ['mask', 'belt', 'gloves', 'boots'],
       bodyType: 'athletic',
       hairStyle: 'short',
-      eyeStyle: 'masked'
+      eyeStyle: 'masked',
+      portrait: createDefaultPortraitConfig()
     },
     powers: [
       { id: 'martial-arts', name: '武术大师', icon: '🥋', description: '精通世界各国武术', level: 95 },
@@ -84,7 +87,8 @@ export const heroTemplates: Hero[] = [
       accessories: ['helmet', 'gloves', 'boots', 'watch'],
       bodyType: 'robotic',
       hairStyle: 'short',
-      eyeStyle: 'robotic'
+      eyeStyle: 'robotic',
+      portrait: createDefaultPortraitConfig()
     },
     powers: [
       { id: 'repulsor', name: '脉冲炮', icon: '💥', description: '手掌发射能量脉冲', level: 85 },
@@ -120,7 +124,8 @@ export const heroTemplates: Hero[] = [
       accessories: ['cape', 'mask', 'necklace'],
       bodyType: 'slim',
       hairStyle: 'long',
-      eyeStyle: 'glowing'
+      eyeStyle: 'glowing',
+      portrait: createDefaultPortraitConfig()
     },
     powers: [
       { id: 'invisibility', name: '隐身', icon: '👻', description: '可以完全隐形', level: 95 },
@@ -156,7 +161,8 @@ export const heroTemplates: Hero[] = [
       accessories: ['helmet', 'cape', 'shield', 'sword'],
       bodyType: 'muscular',
       hairStyle: 'spiky',
-      eyeStyle: 'glowing'
+      eyeStyle: 'glowing',
+      portrait: createDefaultPortraitConfig()
     },
     powers: [
       { id: 'pyrokinesis', name: '控火术', icon: '🔥', description: '操控火焰', level: 95 },
@@ -192,7 +198,8 @@ export const heroTemplates: Hero[] = [
       accessories: ['mask', 'boots', 'belt'],
       bodyType: 'athletic',
       hairStyle: 'short',
-      eyeStyle: 'normal'
+      eyeStyle: 'normal',
+      portrait: createDefaultPortraitConfig()
     },
     powers: [
       { id: 'super-speed', name: '超级速度', icon: '💨', description: '接近光速', level: 95 },
@@ -228,7 +235,8 @@ export const heroTemplates: Hero[] = [
       accessories: ['necklace', 'boots'],
       bodyType: 'muscular',
       hairStyle: 'long',
-      eyeStyle: 'normal'
+      eyeStyle: 'normal',
+      portrait: createDefaultPortraitConfig()
     },
     powers: [
       { id: 'aquatic', name: '海洋能力', icon: '🌊', description: '在水中自由呼吸', level: 100 },
@@ -264,7 +272,8 @@ export const heroTemplates: Hero[] = [
       accessories: ['wand', 'necklace', 'cape'],
       bodyType: 'slim',
       hairStyle: 'ponytail',
-      eyeStyle: 'normal'
+      eyeStyle: 'normal',
+      portrait: createDefaultPortraitConfig()
     },
     powers: [
       { id: 'magic', name: '魔法能量', icon: '💫', description: '使用星光魔法', level: 85 },

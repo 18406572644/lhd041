@@ -2,6 +2,9 @@
 import { computed } from 'vue';
 import type { Hero } from '../../types';
 import { colorSchemes, avatars, costumes, bodyTypes, hairStyles, eyeStyles, accessories } from '../../data/appearance';
+import CharacterPortrait from './CharacterPortrait.vue';
+import { createDefaultPortraitConfig } from '../../data/portraitAssets';
+import type { PortraitConfig } from '../../types';
 
 const props = defineProps<{
   hero: Hero;
@@ -14,6 +17,19 @@ const sizeMap = {
   small: { container: 'w-32 h-40', avatar: 'text-4xl', name: 'text-sm' },
   medium: { container: 'w-48 h-60', avatar: 'text-6xl', name: 'text-lg' },
   large: { container: 'w-64 h-80', avatar: 'text-8xl', name: 'text-xl' }
+};
+
+const portraitConfig = computed<PortraitConfig>(() => {
+  if (props.hero.appearance.portrait) {
+    return props.hero.appearance.portrait;
+  }
+  return createDefaultPortraitConfig();
+});
+
+const portraitSizeMap = {
+  small: 'small' as const,
+  medium: 'medium' as const,
+  large: 'large' as const
 };
 
 const colorScheme = computed(() => {
@@ -60,7 +76,12 @@ const accessoryNames = computed(() => {
     :style="{ '--primary': colorScheme.primary, '--secondary': colorScheme.secondary }"
   >
     <div class="preview-header">
-      <span class="hero-avatar" :class="sizeMap[size].avatar">{{ avatarEmoji }}</span>
+      <CharacterPortrait
+        :config="portraitConfig"
+        :size="portraitSizeMap[size]"
+        class="hero-portrait"
+        show-background
+      />
     </div>
     
     <div class="preview-body">
@@ -117,15 +138,17 @@ const accessoryNames = computed(() => {
 }
 
 .preview-header {
-  height: 40%;
+  height: 45%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.15);
   border-bottom: 3px solid #212121;
+  padding: 8px;
+  box-sizing: border-box;
 }
 
-.hero-avatar {
+.hero-portrait {
   filter: drop-shadow(3px 3px 0 #212121);
   animation: float 3s ease-in-out infinite;
 }

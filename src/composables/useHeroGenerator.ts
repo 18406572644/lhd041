@@ -4,6 +4,7 @@ import { generateId, randomPick, randomPickN, randomInt } from '../utils/random'
 import { generateBackstory } from '../utils/storyGenerator';
 import { heroNames, realNames, catchphrases, weaknesses } from '../data/powers';
 import { avatars, costumes, colorSchemes, accessories, bodyTypes, hairStyles, eyeStyles } from '../data/appearance';
+import { createDefaultPortraitConfig } from '../data/portraitAssets';
 
 const DEFAULT_FOLDER_ID = 'default';
 
@@ -24,7 +25,8 @@ function generateRandomAppearance(): Appearance {
     accessories: randomPickN(accessories, randomInt(1, 4)).map(a => a.id),
     bodyType: randomPick(bodyTypes).id,
     hairStyle: randomPick(hairStyles).id,
-    eyeStyle: randomPick(eyeStyles).id
+    eyeStyle: randomPick(eyeStyles).id,
+    portrait: createDefaultPortraitConfig()
   };
 }
 
@@ -88,7 +90,8 @@ export function useHeroGenerator() {
         accessories: [],
         bodyType: bodyTypes[0].id,
         hairStyle: hairStyles[0].id,
-        eyeStyle: eyeStyles[0].id
+        eyeStyle: eyeStyles[0].id,
+        portrait: createDefaultPortraitConfig()
       },
       powers: [],
       stats: { ...defaultStats },
