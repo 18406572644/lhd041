@@ -5,6 +5,8 @@ import { generateBackstory } from '../utils/storyGenerator';
 import { heroNames, realNames, catchphrases, weaknesses } from '../data/powers';
 import { avatars, costumes, colorSchemes, accessories, bodyTypes, hairStyles, eyeStyles } from '../data/appearance';
 
+const DEFAULT_FOLDER_ID = 'default';
+
 const defaultStats: Stats = {
   strength: 50,
   speed: 50,
@@ -95,6 +97,7 @@ export function useHeroGenerator() {
       cardTemplate: 'classic',
       effects: [],
       likes: 0,
+      folderId: DEFAULT_FOLDER_ID,
       createdAt: new Date().toISOString()
     };
   }
@@ -117,6 +120,7 @@ export function useHeroGenerator() {
       cardTemplate: randomPick(['classic', 'vintage', 'modern', 'action', 'noir', 'pop-art', 'japanese', 'space']),
       effects: [],
       likes: 0,
+      folderId: DEFAULT_FOLDER_ID,
       createdAt: new Date().toISOString()
     };
     

@@ -52,7 +52,19 @@ export interface Hero {
   cardTemplate: string;
   effects: ComicEffect[];
   likes: number;
+  folderId: string;
   createdAt: string;
+}
+
+export interface FavoriteFolder {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  order: number;
+  heroIds: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CardTemplate {

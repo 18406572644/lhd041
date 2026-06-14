@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Hero, HeroWithRank, Power, CardTemplate, ComicEffect, Appearance, Stats } from '../types';
+import type { Hero, HeroWithRank, Power, CardTemplate, ComicEffect, Appearance, Stats, FavoriteFolder } from '../types';
 import { getHeroTemplates, getHotHeroes, getPowers, getCardTemplates, likeHero as apiLikeHero, shareHero as apiShareHero } from '../utils/mockApi';
 import { generateId, randomPick, randomPickN, randomInt } from '../utils/random';
 import { generateBackstory } from '../utils/storyGenerator';
@@ -8,13 +8,50 @@ import { heroNames, realNames, catchphrases, weaknesses } from '../data/powers';
 import { avatars, costumes, colorSchemes, accessories, bodyTypes, hairStyles, eyeStyles } from '../data/appearance';
 
 const STORAGE_KEY = 'comic-hero-collection';
-const DATA_VERSION = '1.0';
+const DATA_VERSION = '2.0';
+const DEFAULT_FOLDER_ID = 'default';
 
 interface StorageData {
   version: string;
   heroes: Hero[];
+  folders: FavoriteFolder[];
   createdAt: string;
   updatedAt: string;
+}
+
+function createDefaultFolder(): FavoriteFolder {
+  return {
+    id: DEFAULT_FOLDER_ID,
+    name: '未分组',
+    icon: '📁',
+    color: '#9e9e9e',
+    order: 0,
+    heroIds: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function migrateData(data: any): StorageData {
+  if (data.version === '2.0') {
+    return data;
+  }
+
+  const heroes: Hero[] = (data.heroes || []).map((hero: Hero) => ({
+    ...hero,
+    folderId: DEFAULT_FOLDER_ID
+  }));
+
+  const defaultFolder = createDefaultFolder();
+  defaultFolder.heroIds = heroes.map(h => h.id);
+
+  return {
+    version: DATA_VERSION,
+    heroes,
+    folders: [defaultFolder],
+    createdAt: data.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
 }
 
 function initializeStorage(): StorageData {
@@ -22,9 +59,7 @@ function initializeStorage(): StorageData {
     const existing = localStorage.getItem(STORAGE_KEY);
     if (existing) {
       const parsed = JSON.parse(existing);
-      if (parsed.version === DATA_VERSION) {
-        return parsed;
-      }
+      return migrateData(parsed);
     }
   } catch (e) {
     console.error('Storage init error:', e);
@@ -32,6 +67,7 @@ function initializeStorage(): StorageData {
   return {
     version: DATA_VERSION,
     heroes: [],
+    folders: [createDefaultFolder()],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -68,6 +104,7 @@ function createEmptyHero(): Hero {
     cardTemplate: 'classic',
     effects: [],
     likes: 0,
+    folderId: DEFAULT_FOLDER_ID,
     createdAt: new Date().toISOString()
   };
 }
@@ -145,6 +182,145 @@ export const useHeroStore = defineStore('hero', () => {
   const isSaving = ref(false);
 
   const savedHeroes = computed(() => storageData.value.heroes);
+  const folders = computed(() => 
+    [...storageData.value.folders].sort((a, b) => a.order - b.order)
+  );
+  const defaultFolder = computed(() => 
+    storageData.value.folders.find(f => f.id === DEFAULT_FOLDER_ID)
+  );
+
+  function getFolderById(folderId: string): FavoriteFolder | undefined {
+    return storageData.value.folders.find(f => f.id === folderId);
+  }
+
+  function getHeroesByFolder(folderId: string): Hero[] {
+    const folder = getFolderById(folderId);
+    if (!folder) return [];
+    return folder.heroIds
+      .map(id => storageData.value.heroes.find(h => h.id === id))
+      .filter((h): h is Hero => h !== undefined);
+  }
+
+  function createFolder(name: string, icon: string = '📁', color: string = '#2196f3'): FavoriteFolder {
+    const maxOrder = Math.max(...storageData.value.folders.map(f => f.order), 0);
+    const newFolder: FavoriteFolder = {
+      id: `folder-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      name: name.trim(),
+      icon,
+      color,
+      order: maxOrder + 1,
+      heroIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    storageData.value.folders.push(newFolder);
+    saveToStorage();
+    return newFolder;
+  }
+
+  function updateFolder(folderId: string, updates: Partial<Omit<FavoriteFolder, 'id' | 'heroIds' | 'createdAt'>>): boolean {
+    const folder = getFolderById(folderId);
+    if (!folder || folderId === DEFAULT_FOLDER_ID) return false;
+    Object.assign(folder, updates, { updatedAt: new Date().toISOString() });
+    saveToStorage();
+    return true;
+  }
+
+  function deleteFolder(folderId: string): boolean {
+    if (folderId === DEFAULT_FOLDER_ID) return false;
+    const folder = getFolderById(folderId);
+    if (!folder) return false;
+
+    folder.heroIds.forEach(heroId => {
+      const hero = storageData.value.heroes.find(h => h.id === heroId);
+      if (hero) {
+        hero.folderId = DEFAULT_FOLDER_ID;
+        const defaultFolder = getFolderById(DEFAULT_FOLDER_ID);
+        if (defaultFolder && !defaultFolder.heroIds.includes(heroId)) {
+          defaultFolder.heroIds.push(heroId);
+        }
+      }
+    });
+
+    storageData.value.folders = storageData.value.folders.filter(f => f.id !== folderId);
+    saveToStorage();
+    return true;
+  }
+
+  function reorderFolders(fromIndex: number, toIndex: number): void {
+    const folderList = [...storageData.value.folders].sort((a, b) => a.order - b.order);
+    const [removed] = folderList.splice(fromIndex, 1);
+    folderList.splice(toIndex, 0, removed);
+    folderList.forEach((folder, index) => {
+      folder.order = index;
+      folder.updatedAt = new Date().toISOString();
+    });
+    saveToStorage();
+  }
+
+  function moveHeroToFolder(heroId: string, targetFolderId: string): boolean {
+    const hero = storageData.value.heroes.find(h => h.id === heroId);
+    if (!hero) return false;
+
+    const currentFolder = getFolderById(hero.folderId);
+    const targetFolder = getFolderById(targetFolderId);
+    if (!targetFolder) return false;
+
+    if (currentFolder) {
+      currentFolder.heroIds = currentFolder.heroIds.filter(id => id !== heroId);
+      currentFolder.updatedAt = new Date().toISOString();
+    }
+
+    if (!targetFolder.heroIds.includes(heroId)) {
+      targetFolder.heroIds.push(heroId);
+    }
+    targetFolder.updatedAt = new Date().toISOString();
+    hero.folderId = targetFolderId;
+
+    saveToStorage();
+    return true;
+  }
+
+  function moveHeroesToFolder(heroIds: string[], targetFolderId: string): number {
+    let movedCount = 0;
+    heroIds.forEach(heroId => {
+      if (moveHeroToFolder(heroId, targetFolderId)) {
+        movedCount++;
+      }
+    });
+    return movedCount;
+  }
+
+  function reorderHeroesInFolder(folderId: string, fromIndex: number, toIndex: number): boolean {
+    const folder = getFolderById(folderId);
+    if (!folder) return false;
+
+    const heroIds = [...folder.heroIds];
+    const [removed] = heroIds.splice(fromIndex, 1);
+    heroIds.splice(toIndex, 0, removed);
+    folder.heroIds = heroIds;
+    folder.updatedAt = new Date().toISOString();
+    saveToStorage();
+    return true;
+  }
+
+  function saveCurrentHero(folderId: string = DEFAULT_FOLDER_ID): boolean {
+    if (!currentHero.value) return false;
+    const exists = storageData.value.heroes.some(h => h.id === currentHero.value!.id);
+    if (exists) return false;
+    
+    currentHero.value.folderId = folderId;
+    storageData.value.heroes.unshift(currentHero.value);
+    
+    const folder = getFolderById(folderId);
+    if (folder && !folder.heroIds.includes(currentHero.value.id)) {
+      folder.heroIds.unshift(currentHero.value.id);
+      folder.updatedAt = new Date().toISOString();
+    }
+    
+    saveToStorage();
+    return true;
+  }
 
   function saveToStorage() {
     try {
@@ -241,6 +417,7 @@ export const useHeroStore = defineStore('hero', () => {
       cardTemplate: randomPick(['classic', 'vintage', 'modern', 'action', 'noir', 'pop-art', 'japanese', 'space']),
       effects: [],
       likes: 0,
+      folderId: DEFAULT_FOLDER_ID,
       createdAt: new Date().toISOString()
     };
     
@@ -267,15 +444,6 @@ export const useHeroStore = defineStore('hero', () => {
     }
   }
 
-  function saveCurrentHero(): boolean {
-    if (!currentHero.value) return false;
-    const exists = storageData.value.heroes.some(h => h.id === currentHero.value!.id);
-    if (exists) return false;
-    storageData.value.heroes.unshift(currentHero.value);
-    saveToStorage();
-    return true;
-  }
-
   function updateExistingHero(hero: Hero): boolean {
     const index = storageData.value.heroes.findIndex(h => h.id === hero.id);
     if (index === -1) return false;
@@ -288,6 +456,10 @@ export const useHeroStore = defineStore('hero', () => {
     const initialLength = storageData.value.heroes.length;
     storageData.value.heroes = storageData.value.heroes.filter(h => h.id !== heroId);
     if (storageData.value.heroes.length < initialLength) {
+      storageData.value.folders.forEach(folder => {
+        folder.heroIds = folder.heroIds.filter(id => id !== heroId);
+        folder.updatedAt = new Date().toISOString();
+      });
       saveToStorage();
       return true;
     }
@@ -311,6 +483,7 @@ export const useHeroStore = defineStore('hero', () => {
       ...hero, 
       id: generateId(), 
       likes: 0, 
+      folderId: DEFAULT_FOLDER_ID,
       createdAt: new Date().toISOString(),
       effects: []
     };
@@ -438,6 +611,7 @@ export const useHeroStore = defineStore('hero', () => {
 
   async function clearAllHeroes(): Promise<boolean> {
     storageData.value.heroes = [];
+    storageData.value.folders = [createDefaultFolder()];
     saveToStorage();
     return true;
   }
@@ -454,6 +628,8 @@ export const useHeroStore = defineStore('hero', () => {
     powers,
     cardTemplates,
     savedHeroes,
+    folders,
+    defaultFolder,
     isLoadingTemplates,
     isLoadingHot,
     isLoadingPowers,
@@ -489,6 +665,15 @@ export const useHeroStore = defineStore('hero', () => {
     deleteSavedHero,
     shareHero,
     clearAllHeroes,
-    likeHero
+    likeHero,
+    getFolderById,
+    getHeroesByFolder,
+    createFolder,
+    updateFolder,
+    deleteFolder,
+    reorderFolders,
+    moveHeroToFolder,
+    moveHeroesToFolder,
+    reorderHeroesInFolder
   };
 });

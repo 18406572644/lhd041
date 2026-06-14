@@ -33,6 +33,7 @@ export const heroTemplates: Hero[] = [
     cardTemplate: 'classic',
     effects: [],
     likes: 2847,
+    folderId: 'default',
     createdAt: '2024-01-15T10:30:00Z'
   },
   {
@@ -68,6 +69,7 @@ export const heroTemplates: Hero[] = [
     cardTemplate: 'noir',
     effects: [],
     likes: 3521,
+    folderId: 'default',
     createdAt: '2024-01-10T14:20:00Z'
   },
   {
@@ -103,6 +105,7 @@ export const heroTemplates: Hero[] = [
     cardTemplate: 'modern',
     effects: [],
     likes: 4128,
+    folderId: 'default',
     createdAt: '2024-01-08T09:15:00Z'
   },
   {
@@ -138,6 +141,7 @@ export const heroTemplates: Hero[] = [
     cardTemplate: 'vintage',
     effects: [],
     likes: 2654,
+    folderId: 'default',
     createdAt: '2024-01-12T16:45:00Z'
   },
   {
@@ -173,6 +177,7 @@ export const heroTemplates: Hero[] = [
     cardTemplate: 'action',
     effects: [],
     likes: 3892,
+    folderId: 'default',
     createdAt: '2024-01-05T11:30:00Z'
   },
   {
@@ -208,6 +213,7 @@ export const heroTemplates: Hero[] = [
     cardTemplate: 'classic',
     effects: [],
     likes: 4567,
+    folderId: 'default',
     createdAt: '2024-01-03T08:20:00Z'
   },
   {
@@ -243,6 +249,7 @@ export const heroTemplates: Hero[] = [
     cardTemplate: 'japanese',
     effects: [],
     likes: 2987,
+    folderId: 'default',
     createdAt: '2024-01-18T13:50:00Z'
   },
   {
@@ -278,6 +285,7 @@ export const heroTemplates: Hero[] = [
     cardTemplate: 'pop-art',
     effects: [],
     likes: 5234,
+    folderId: 'default',
     createdAt: '2024-01-20T15:30:00Z'
   }
 ];

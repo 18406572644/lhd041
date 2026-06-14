@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   Sparkles, Save, RotateCcw, Palette, Zap, BookOpen, Image,
-  Sparkles as EffectIcon, ArrowLeft, Package, X, Check
+  Sparkles as EffectIcon, ArrowLeft, Package, X, Check, FolderPlus
 } from 'lucide-vue-next';
 import { useHeroStore } from '../stores/hero';
 import { usePresetsStore } from '../stores/presets';
@@ -29,6 +29,67 @@ const currentHero = computed(() => heroStore.currentHero);
 
 const showFullPresetDialog = ref(false);
 const fullPresetName = ref('');
+const showFolderDialog = ref(false);
+const selectedFolderId = ref('default');
+const newFolderName = ref('');
+const newFolderIcon = ref('📁');
+const newFolderColor = ref('#2196f3');
+const showNewFolderInput = ref(false);
+
+const folderIcons = ['📁', '🗡️', '🦸', '😈', '😂', '🤖', '🌟', '🔥', '💎', '🎯', '⚡', '🎭'];
+const folderColors = ['#2196f3', '#4caf50', '#ff9800', '#e53935', '#9c27b0', '#00bcd4', '#795548', '#607d8b'];
+
+const folders = computed(() => heroStore.folders);
+
+function openSaveDialog() {
+  if (!currentHero.value) return;
+  selectedFolderId.value = 'default';
+  showNewFolderInput.value = false;
+  newFolderName.value = '';
+  newFolderIcon.value = '📁';
+  newFolderColor.value = '#2196f3';
+  showFolderDialog.value = true;
+}
+
+function toggleNewFolder() {
+  showNewFolderInput.value = !showNewFolderInput.value;
+  if (showNewFolderInput.value) {
+    newFolderName.value = '';
+    setTimeout(() => {
+      const input = document.getElementById('new-folder-name-input') as HTMLInputElement;
+      input?.focus();
+    }, 100);
+  }
+}
+
+function createAndSelectFolder() {
+  const name = newFolderName.value.trim();
+  if (!name) {
+    uiStore.showWarning('请输入收藏夹名称');
+    return;
+  }
+  const folder = heroStore.createFolder(name, newFolderIcon.value, newFolderColor.value);
+  selectedFolderId.value = folder.id;
+  showNewFolderInput.value = false;
+  newFolderName.value = '';
+  uiStore.showSuccess(`收藏夹「${name}」已创建`);
+}
+
+async function confirmSaveWithFolder() {
+  if (!currentHero.value) return;
+  
+  try {
+    const isNew = !heroStore.savedHeroes.some(h => h.id === currentHero.value!.id);
+    heroStore.saveCurrentHero(selectedFolderId.value);
+    const folder = heroStore.getFolderById(selectedFolderId.value);
+    const folderName = folder ? folder.name : '未分组';
+    uiStore.showSuccess(isNew ? `英雄已保存到「${folderName}」！` : '英雄已更新！');
+    showFolderDialog.value = false;
+    router.push('/favorites');
+  } catch (e) {
+    uiStore.showError('保存失败，请重试');
+  }
+}
 
 const tabs = [
   { id: 'appearance', label: '外观', icon: Palette },
@@ -53,19 +114,6 @@ async function generateNewHero() {
     uiStore.showSuccess('新英雄已生成！');
   } catch (e) {
     uiStore.showError('生成失败，请重试');
-  }
-}
-
-async function saveHero() {
-  if (!currentHero.value) return;
-  
-  try {
-    const isNew = !heroStore.savedHeroes.some(h => h.id === currentHero.value!.id);
-    await heroStore.saveCurrentHero();
-    uiStore.showSuccess(isNew ? '英雄已保存到收藏！' : '英雄已更新！');
-    router.push('/favorites');
-  } catch (e) {
-    uiStore.showError('保存失败，请重试');
   }
 }
 
@@ -155,7 +203,7 @@ function handleApplyFullPreset(preset: Preset) {
         <button 
           class="action-btn save"
           :disabled="!currentHero"
-          @click="saveHero"
+          @click="openSaveDialog"
         >
           <Save :size="18" />
           <span>保存英雄</span>
@@ -245,6 +293,91 @@ function handleApplyFullPreset(preset: Preset) {
             <button class="dialog-btn confirm" @click="confirmSaveFullPreset">
               <Check :size="16" />
               <span>保存套装</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showFolderDialog" class="dialog-overlay" @click.self="showFolderDialog = false">
+        <div class="save-folder-dialog">
+          <div class="dialog-header folder-header">
+            <Save :size="20" />
+            <span>保存到收藏夹</span>
+            <button class="dialog-close" @click="showFolderDialog = false">
+              <X :size="18" />
+            </button>
+          </div>
+          <div class="dialog-body">
+            <label class="input-label">选择收藏夹</label>
+            <div class="folder-list">
+              <div
+                v-for="folder in folders"
+                :key="folder.id"
+                class="folder-option"
+                :class="{ selected: selectedFolderId === folder.id }"
+                @click="selectedFolderId = folder.id"
+              >
+                <span class="folder-icon">{{ folder.icon }}</span>
+                <span class="folder-name">{{ folder.name }}</span>
+                <span class="folder-count">{{ heroStore.getHeroesByFolder(folder.id).length }}</span>
+                <span v-if="selectedFolderId === folder.id" class="folder-check">✓</span>
+              </div>
+            </div>
+
+            <button class="new-folder-toggle" @click="toggleNewFolder">
+              <FolderPlus :size="16" />
+              <span>{{ showNewFolderInput ? '取消新建' : '新建收藏夹' }}</span>
+            </button>
+
+            <div v-if="showNewFolderInput" class="new-folder-form">
+              <div class="form-row">
+                <input
+                  id="new-folder-name-input"
+                  type="text"
+                  class="name-input"
+                  v-model="newFolderName"
+                  placeholder="收藏夹名称..."
+                  @keyup.enter="createAndSelectFolder"
+                />
+              </div>
+              <div class="form-row">
+                <label class="input-label">图标</label>
+                <div class="icon-picker">
+                  <button
+                    v-for="icon in folderIcons"
+                    :key="icon"
+                    class="icon-btn"
+                    :class="{ active: newFolderIcon === icon }"
+                    @click="newFolderIcon = icon"
+                  >{{ icon }}</button>
+                </div>
+              </div>
+              <div class="form-row">
+                <label class="input-label">颜色</label>
+                <div class="color-picker">
+                  <button
+                    v-for="color in folderColors"
+                    :key="color"
+                    class="color-btn"
+                    :class="{ active: newFolderColor === color }"
+                    :style="{ background: color }"
+                    @click="newFolderColor = color"
+                  />
+                </div>
+              </div>
+              <button class="create-folder-btn" @click="createAndSelectFolder">
+                <Check :size="16" />
+                <span>创建并选择</span>
+              </button>
+            </div>
+          </div>
+          <div class="dialog-footer">
+            <button class="dialog-btn cancel" @click="showFolderDialog = false">取消</button>
+            <button class="dialog-btn confirm save-confirm" @click="confirmSaveWithFolder">
+              <Save :size="16" />
+              <span>保存英雄</span>
             </button>
           </div>
         </div>
@@ -695,5 +828,208 @@ function handleApplyFullPreset(preset: Preset) {
 .dialog-btn:hover {
   transform: translateY(-2px);
   box-shadow: 5px 5px 0 #212121;
+}
+
+.save-folder-dialog {
+  background: #fafafa;
+  border: 4px solid #212121;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 520px;
+  box-shadow: 8px 8px 0 #212121;
+  overflow: hidden;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.folder-header {
+  background: linear-gradient(135deg, #4caf50, #2e7d32) !important;
+}
+
+.save-folder-dialog .dialog-body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.folder-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fafafa;
+  border: 3px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.folder-option:hover {
+  border-color: #4caf50;
+  background: #e8f5e9;
+}
+
+.folder-option.selected {
+  border-color: #4caf50;
+  background: #e8f5e9;
+  box-shadow: 2px 2px 0 #4caf50;
+}
+
+.folder-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.folder-name {
+  flex: 1;
+  font-family: 'Comic Neue', cursive;
+  font-size: 15px;
+  font-weight: 700;
+  color: #212121;
+}
+
+.folder-count {
+  padding: 2px 10px;
+  background: #e0e0e0;
+  border-radius: 12px;
+  font-family: 'Bangers', cursive;
+  font-size: 13px;
+  color: #616161;
+}
+
+.folder-check {
+  color: #4caf50;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.new-folder-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: transparent;
+  border: 3px dashed #bdbdbd;
+  border-radius: 8px;
+  font-family: 'Comic Neue', cursive;
+  font-size: 14px;
+  font-weight: 700;
+  color: #757575;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  justify-content: center;
+}
+
+.new-folder-toggle:hover {
+  border-color: #4caf50;
+  color: #4caf50;
+  background: #e8f5e9;
+}
+
+.new-folder-form {
+  margin-top: 12px;
+  padding: 16px;
+  background: #e8f5e9;
+  border: 3px solid #4caf50;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.icon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  background: #fafafa;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:hover {
+  border-color: #4caf50;
+}
+
+.icon-btn.active {
+  border-color: #4caf50;
+  background: #c8e6c9;
+  box-shadow: 2px 2px 0 #4caf50;
+}
+
+.color-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.color-btn {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e0e0e0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.color-btn:hover {
+  transform: scale(1.15);
+}
+
+.color-btn.active {
+  border-color: #212121;
+  box-shadow: 2px 2px 0 #212121;
+  transform: scale(1.15);
+}
+
+.create-folder-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: #4caf50;
+  color: #fafafa;
+  border: 3px solid #212121;
+  border-radius: 6px;
+  font-family: 'Bangers', cursive;
+  font-size: 14px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 3px 3px 0 #212121;
+}
+
+.create-folder-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 5px 5px 0 #212121;
+}
+
+.save-confirm {
+  background: linear-gradient(135deg, #4caf50, #2e7d32) !important;
 }
 </style>
