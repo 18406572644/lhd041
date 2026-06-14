@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Palette, User, Shirt, Scissors, Eye, PersonStanding, Sparkles } from 'lucide-vue-next';
-import type { Hero } from '../../types';
+import type { Hero, Preset, AppearancePreset } from '../../types';
 import { avatars, costumes, colorSchemes, accessories, bodyTypes, hairStyles, eyeStyles } from '../../data/appearance';
 import { useHeroStore } from '../../stores/hero';
+import { usePresetsStore } from '../../stores/presets';
 import { useUiStore } from '../../stores/ui';
+import PresetsPanel from './PresetsPanel.vue';
 
 const props = defineProps<{
   hero: Hero;
 }>();
 
 const heroStore = useHeroStore();
+const presetsStore = usePresetsStore();
 const uiStore = useUiStore();
 
 const selectedColorScheme = computed(() => {
@@ -38,6 +41,23 @@ function toggleAccessory(accId: string) {
       uiStore.showWarning('最多只能选择4个配饰');
     }
   }
+}
+
+function handleSavePreset(name: string) {
+  try {
+    presetsStore.saveAppearancePreset(name, props.hero.appearance);
+    uiStore.showSuccess('外观预设已保存！');
+  } catch (e) {
+    uiStore.showError('保存失败，请重试');
+  }
+}
+
+function handleApplyPreset(preset: Preset) {
+  if (preset.category !== 'appearance') return;
+  const appearancePreset = preset as AppearancePreset;
+  heroStore.updateCurrentHero({
+    appearance: { ...appearancePreset.data }
+  });
 }
 </script>
 
@@ -179,6 +199,12 @@ function toggleAccessory(accId: string) {
         </div>
       </div>
     </div>
+
+    <PresetsPanel
+      category="appearance"
+      @save="handleSavePreset"
+      @apply="handleApplyPreset"
+    />
   </div>
 </template>
 

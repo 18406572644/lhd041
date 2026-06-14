@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { Image, Download, Copy, Sparkles } from 'lucide-vue-next';
-import type { Hero } from '../../types';
+import type { Hero, Preset, CardPreset } from '../../types';
 import { useHeroStore } from '../../stores/hero';
+import { usePresetsStore } from '../../stores/presets';
 import { useUiStore } from '../../stores/ui';
 import { useCardExport } from '../../composables/useCardExport';
 import { avatars, colorSchemes } from '../../data/appearance';
+import PresetsPanel from './PresetsPanel.vue';
 
 const props = defineProps<{
   hero: Hero;
 }>();
 
 const heroStore = useHeroStore();
+const presetsStore = usePresetsStore();
 const uiStore = useUiStore();
 const { exportAndDownload, copyToClipboard, isExporting } = useCardExport();
 
@@ -51,6 +54,23 @@ async function copyCard() {
   } catch (e) {
     uiStore.showError('复制失败，请重试');
   }
+}
+
+function handleSavePreset(name: string) {
+  try {
+    presetsStore.saveCardPreset(name, props.hero.cardTemplate);
+    uiStore.showSuccess('卡片预设已保存！');
+  } catch (e) {
+    uiStore.showError('保存失败，请重试');
+  }
+}
+
+function handleApplyPreset(preset: Preset) {
+  if (preset.category !== 'card') return;
+  const cardPreset = preset as CardPreset;
+  heroStore.updateCurrentHero({
+    cardTemplate: cardPreset.data.cardTemplate
+  });
 }
 </script>
 
@@ -191,6 +211,12 @@ async function copyCard() {
         </div>
       </div>
     </div>
+
+    <PresetsPanel
+      category="card"
+      @save="handleSavePreset"
+      @apply="handleApplyPreset"
+    />
   </div>
 </template>
 

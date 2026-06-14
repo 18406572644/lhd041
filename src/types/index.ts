@@ -75,3 +75,75 @@ export interface ApiResponse<T> {
 }
 
 export type HeroWithRank = Hero & { rank: number };
+
+export type PresetCategory = 'appearance' | 'powers' | 'story' | 'effects' | 'card' | 'full';
+
+export interface BasePreset {
+  id: string;
+  name: string;
+  category: PresetCategory;
+  thumbnail?: string;
+  usageCount: number;
+  isPinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppearancePreset extends BasePreset {
+  category: 'appearance';
+  data: Appearance;
+}
+
+export interface PowersPreset extends BasePreset {
+  category: 'powers';
+  data: {
+    powers: Power[];
+    stats: Stats;
+    weakness: string;
+  };
+}
+
+export interface StoryPreset extends BasePreset {
+  category: 'story';
+  data: {
+    catchphrase: string;
+    backstoryTemplate: string;
+  };
+}
+
+export interface EffectsPreset extends BasePreset {
+  category: 'effects';
+  data: ComicEffect[];
+}
+
+export interface CardPreset extends BasePreset {
+  category: 'card';
+  data: {
+    cardTemplate: string;
+  };
+}
+
+export interface FullPreset extends BasePreset {
+  category: 'full';
+  data: {
+    appearance: Appearance;
+    powers: Power[];
+    stats: Stats;
+    weakness: string;
+    catchphrase: string;
+    backstory: string;
+    cardTemplate: string;
+    effects: ComicEffect[];
+  };
+}
+
+export type Preset = AppearancePreset | PowersPreset | StoryPreset | EffectsPreset | CardPreset | FullPreset;
+
+export interface PresetsStorageData {
+  version: string;
+  presets: Preset[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SortMode = 'date' | 'usage' | 'name';

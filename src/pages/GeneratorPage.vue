@@ -1,24 +1,34 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Sparkles, Save, RotateCcw, Palette, Zap, BookOpen, Image, Sparkles as EffectIcon, ArrowLeft } from 'lucide-vue-next';
+import {
+  Sparkles, Save, RotateCcw, Palette, Zap, BookOpen, Image,
+  Sparkles as EffectIcon, ArrowLeft, Package, X, Check
+} from 'lucide-vue-next';
 import { useHeroStore } from '../stores/hero';
+import { usePresetsStore } from '../stores/presets';
 import { useUiStore } from '../stores/ui';
+import type { Preset, FullPreset } from '../types';
 import HeroPreview from '../components/hero/HeroPreview.vue';
 import AppearanceEditor from '../components/hero/AppearanceEditor.vue';
 import PowerEditor from '../components/hero/PowerEditor.vue';
 import StoryEditor from '../components/hero/StoryEditor.vue';
 import ComicCardEditor from '../components/hero/ComicCardEditor.vue';
 import EffectEditor from '../components/hero/EffectEditor.vue';
+import PresetsPanel from '../components/hero/PresetsPanel.vue';
 
 const route = useRoute();
 const router = useRouter();
 const heroStore = useHeroStore();
+const presetsStore = usePresetsStore();
 const uiStore = useUiStore();
 
 const activeTab = ref('appearance');
 const isGenerating = computed(() => heroStore.isGenerating);
 const currentHero = computed(() => heroStore.currentHero);
+
+const showFullPresetDialog = ref(false);
+const fullPresetName = ref('');
 
 const tabs = [
   { id: 'appearance', label: '外观', icon: Palette },
@@ -62,6 +72,55 @@ async function saveHero() {
 function goBack() {
   router.back();
 }
+
+function openFullPresetDialog() {
+  if (!currentHero.value) return;
+  fullPresetName.value = currentHero.value.name ? `${currentHero.value.name}套装` : '';
+  showFullPresetDialog.value = true;
+  setTimeout(() => {
+    const input = document.getElementById('full-preset-name-input') as HTMLInputElement;
+    input?.focus();
+    input?.select();
+  }, 100);
+}
+
+function confirmSaveFullPreset() {
+  if (!currentHero.value) return;
+  const name = fullPresetName.value.trim();
+  if (!name) {
+    uiStore.showWarning('请输入套装名称');
+    return;
+  }
+  try {
+    presetsStore.saveFullPreset(name, currentHero.value);
+    uiStore.showSuccess('整套预设已保存到「我的套装」！');
+    showFullPresetDialog.value = false;
+  } catch (e) {
+    uiStore.showError('保存失败，请重试');
+  }
+}
+
+function handleApplyFullPreset(preset: Preset) {
+  if (preset.category !== 'full' || !currentHero.value) return;
+  const fullPreset = preset as FullPreset;
+  const d = fullPreset.data;
+  
+  const newEffects = d.effects.map(e => ({
+    ...e,
+    id: `effect-${Date.now()}-${Math.random().toString(36).substr(2, 5)}-${Math.random().toString(36).substr(2, 3)}`
+  }));
+  
+  heroStore.updateCurrentHero({
+    appearance: { ...d.appearance },
+    powers: d.powers.map(p => ({ ...p })),
+    stats: { ...d.stats },
+    weakness: d.weakness,
+    catchphrase: d.catchphrase,
+    backstory: d.backstory,
+    cardTemplate: d.cardTemplate,
+    effects: newEffects
+  });
+}
 </script>
 
 <template>
@@ -76,6 +135,15 @@ function goBack() {
         <span>角色生成器</span>
       </h1>
       <div class="header-actions">
+        <button 
+          class="action-btn preset"
+          :disabled="!currentHero"
+          @click="openFullPresetDialog"
+          title="一键保存全部5项配置为套装"
+        >
+          <Package :size="18" />
+          <span>💾 我的套装</span>
+        </button>
         <button 
           class="action-btn regenerate"
           :disabled="isGenerating"
@@ -109,6 +177,14 @@ function goBack() {
             <p>正在生成英雄...</p>
           </div>
         </div>
+        
+        <div class="full-presets-section">
+          <PresetsPanel
+            category="full"
+            @save="openFullPresetDialog"
+            @apply="handleApplyFullPreset"
+          />
+        </div>
       </div>
       
       <div class="editor-main">
@@ -134,6 +210,46 @@ function goBack() {
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div v-if="showFullPresetDialog" class="dialog-overlay" @click.self="showFullPresetDialog = false">
+        <div class="save-full-dialog">
+          <div class="dialog-header">
+            <Package :size="20" />
+            <span>保存为我的套装</span>
+            <button class="dialog-close" @click="showFullPresetDialog = false">
+              <X :size="18" />
+            </button>
+          </div>
+          <div class="dialog-body">
+            <div class="preset-summary">
+              <div class="summary-item"><span>🎨</span>外观配置</div>
+              <div class="summary-item"><span>⚡</span>{{ currentHero?.powers.length || 0 }} 个超能力</div>
+              <div class="summary-item"><span>📖</span>故事模板</div>
+              <div class="summary-item"><span>✨</span>{{ currentHero?.effects.length || 0 }} 个特效</div>
+              <div class="summary-item"><span>🎴</span>卡片模板</div>
+            </div>
+            <label class="input-label">套装名称</label>
+            <input
+              id="full-preset-name-input"
+              type="text"
+              class="name-input"
+              v-model="fullPresetName"
+              placeholder="给套装起个名字..."
+              @keyup.enter="confirmSaveFullPreset"
+              @keyup.escape="showFullPresetDialog = false"
+            />
+          </div>
+          <div class="dialog-footer">
+            <button class="dialog-btn cancel" @click="showFullPresetDialog = false">取消</button>
+            <button class="dialog-btn confirm" @click="confirmSaveFullPreset">
+              <Check :size="16" />
+              <span>保存套装</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -240,6 +356,15 @@ function goBack() {
   to { transform: rotate(360deg); }
 }
 
+.action-btn.preset {
+  background: linear-gradient(135deg, #9c27b0, #7b1fa2);
+  color: #fafafa;
+}
+
+.action-btn.preset:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ab47bc, #8e24aa);
+}
+
 .generator-content {
   display: grid;
   grid-template-columns: 360px 1fr;
@@ -250,6 +375,13 @@ function goBack() {
 .preview-sidebar {
   position: sticky;
   top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.full-presets-section {
+  max-height: 520px;
 }
 
 .sticky-preview {
@@ -408,5 +540,160 @@ function goBack() {
   .tab-btn span {
     display: none;
   }
+  
+  .full-presets-section {
+    max-height: none;
+  }
+}
+
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(2px);
+}
+
+.save-full-dialog {
+  background: #fafafa;
+  border: 4px solid #212121;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 8px 8px 0 #212121;
+  overflow: hidden;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #9c27b0, #7b1fa2);
+  color: #fafafa;
+  font-family: 'Bangers', cursive;
+  font-size: 20px;
+  letter-spacing: 1px;
+  text-shadow: 2px 2px 0 #212121;
+}
+
+.dialog-close {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid #fafafa;
+  border-radius: 50%;
+  color: #fafafa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.dialog-close:hover {
+  background: #c62828;
+}
+
+.dialog-body {
+  padding: 20px;
+}
+
+.preset-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 14px;
+  background: #f3e5f5;
+  border: 3px dashed #9c27b0;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Roboto Slab', serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4a148c;
+}
+
+.summary-item span {
+  font-size: 18px;
+}
+
+.input-label {
+  display: block;
+  font-family: 'Roboto Slab', serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #424242;
+  margin-bottom: 8px;
+}
+
+.name-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 3px solid #212121;
+  border-radius: 6px;
+  font-family: 'Comic Neue', cursive;
+  font-size: 15px;
+  font-weight: 700;
+  color: #212121;
+  background: #fafafa;
+  box-shadow: 2px 2px 0 #212121;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.name-input:focus {
+  border-color: #9c27b0;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 3px dashed #bdbdbd;
+}
+
+.dialog-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 22px;
+  border: 3px solid #212121;
+  border-radius: 6px;
+  font-family: 'Bangers', cursive;
+  font-size: 15px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 3px 3px 0 #212121;
+}
+
+.dialog-btn.cancel {
+  background: #fafafa;
+  color: #212121;
+}
+
+.dialog-btn.confirm {
+  background: linear-gradient(135deg, #9c27b0, #7b1fa2);
+  color: #fafafa;
+}
+
+.dialog-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 5px 5px 0 #212121;
 }
 </style>

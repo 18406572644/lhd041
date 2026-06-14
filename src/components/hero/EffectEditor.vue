@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Sparkles, Plus, X } from 'lucide-vue-next';
-import type { Hero, ComicEffect } from '../../types';
+import type { Hero, ComicEffect, Preset, EffectsPreset } from '../../types';
 import { useHeroStore } from '../../stores/hero';
+import { usePresetsStore } from '../../stores/presets';
 import { useUiStore } from '../../stores/ui';
+import PresetsPanel from './PresetsPanel.vue';
 
 const props = defineProps<{
   hero: Hero;
 }>();
 
 const heroStore = useHeroStore();
+const presetsStore = usePresetsStore();
 const uiStore = useUiStore();
 
 const effectOptions = [
@@ -53,6 +56,25 @@ function removeEffect(type: string) {
   if (effect) {
     heroStore.removeEffect(effect.id);
   }
+}
+
+function handleSavePreset(name: string) {
+  try {
+    presetsStore.saveEffectsPreset(name, props.hero.effects);
+    uiStore.showSuccess('特效预设已保存！');
+  } catch (e) {
+    uiStore.showError('保存失败，请重试');
+  }
+}
+
+function handleApplyPreset(preset: Preset) {
+  if (preset.category !== 'effects') return;
+  const effectsPreset = preset as EffectsPreset;
+  const newEffects = effectsPreset.data.map(e => ({
+    ...e,
+    id: `effect-${Date.now()}-${Math.random().toString(36).substr(2, 5)}-${Math.random().toString(36).substr(2, 3)}`
+  }));
+  heroStore.updateCurrentHero({ effects: newEffects });
 }
 </script>
 
@@ -134,6 +156,12 @@ function removeEffect(type: string) {
         </div>
       </div>
     </div>
+
+    <PresetsPanel
+      category="effects"
+      @save="handleSavePreset"
+      @apply="handleApplyPreset"
+    />
   </div>
 </template>
 

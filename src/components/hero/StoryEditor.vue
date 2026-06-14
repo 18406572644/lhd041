@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { BookOpen, RefreshCw, User, Tag, MessageSquare, AlertTriangle } from 'lucide-vue-next';
-import type { Hero } from '../../types';
+import type { Hero, Preset, StoryPreset } from '../../types';
 import { useHeroStore } from '../../stores/hero';
+import { usePresetsStore } from '../../stores/presets';
 import { useUiStore } from '../../stores/ui';
+import PresetsPanel from './PresetsPanel.vue';
 
 const props = defineProps<{
   hero: Hero;
 }>();
 
 const heroStore = useHeroStore();
+const presetsStore = usePresetsStore();
 const uiStore = useUiStore();
 const isRegenerating = ref(false);
 
@@ -48,6 +51,64 @@ async function regenerateBackstory() {
 
 function updateBackstory(value: string) {
   heroStore.updateCurrentHero({ backstory: value });
+}
+
+const placeholderCheatsheet = computed(() => {
+  const powerNames = props.hero.powers.map((p, i) => `{{能力${i + 1}}}`).join('、');
+  return [
+    { key: '{{名字}}', desc: props.hero.name || '英雄称号' },
+    { key: '{{真名}}', desc: props.hero.alias || '真实姓名' },
+    { key: '{{弱点}}', desc: props.hero.weakness || '弱点' },
+    ...props.hero.powers.slice(0, 4).map((p, i) => ({
+      key: `{{能力${i + 1}}}`,
+      desc: p.name
+    }))
+  ];
+});
+
+function insertPlaceholder(placeholder: string) {
+  const textarea = document.querySelector('.editor-area textarea') as HTMLTextAreaElement;
+  if (!textarea) return;
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const current = props.hero.backstory;
+  const newVal = current.substring(0, start) + placeholder + current.substring(end);
+  updateBackstory(newVal);
+  setTimeout(() => {
+    textarea.focus();
+    const newPos = start + placeholder.length;
+    textarea.setSelectionRange(newPos, newPos);
+  }, 0);
+}
+
+function replacePlaceholders(template: string): string {
+  let result = template;
+  result = result.replace(/\{\{名字\}\}/g, props.hero.name || '[名字]');
+  result = result.replace(/\{\{真名\}\}/g, props.hero.alias || '[真名]');
+  result = result.replace(/\{\{弱点\}\}/g, props.hero.weakness || '[弱点]');
+  props.hero.powers.forEach((p, i) => {
+    result = result.replace(new RegExp(`\\{\\{能力${i + 1}\\}\\}`, 'g'), p.name);
+  });
+  return result;
+}
+
+function handleSavePreset(name: string) {
+  try {
+    presetsStore.saveStoryPreset(name, props.hero.catchphrase, props.hero.backstory);
+    uiStore.showSuccess('故事预设已保存！');
+  } catch (e) {
+    uiStore.showError('保存失败，请重试');
+  }
+}
+
+function handleApplyPreset(preset: Preset) {
+  if (preset.category !== 'story') return;
+  const storyPreset = preset as StoryPreset;
+  const replacedBackstory = replacePlaceholders(storyPreset.data.backstoryTemplate);
+  heroStore.updateCurrentHero({
+    catchphrase: storyPreset.data.catchphrase,
+    backstory: replacedBackstory
+  });
 }
 </script>
 
@@ -143,16 +204,37 @@ function updateBackstory(value: string) {
         </div>
         
         <div class="editor-area">
-          <label class="editor-label">编辑故事</label>
+          <div class="label-row">
+            <label class="editor-label">编辑故事</label>
+            <div class="placeholder-hint">可用变量占位符：</div>
+          </div>
+          <div class="placeholder-toolbar">
+            <button
+              v-for="ph in placeholderCheatsheet"
+              :key="ph.key"
+              class="placeholder-chip"
+              :title="`插入 ${ph.key} = ${ph.desc}`"
+              @click="insertPlaceholder(ph.key)"
+            >
+              <span class="ph-key">{{ ph.key }}</span>
+              <span class="ph-desc">{{ ph.desc }}</span>
+            </button>
+          </div>
           <textarea
             :value="hero.backstory"
             @input="updateBackstory(($event.target as HTMLTextAreaElement).value)"
             rows="6"
-            placeholder="在这里编辑你的英雄故事..."
+            placeholder="在这里编辑你的英雄故事... 可用 {{名字}}、{{能力1}} 等占位符创建模板"
           />
         </div>
       </div>
     </div>
+
+    <PresetsPanel
+      category="story"
+      @save="handleSavePreset"
+      @apply="handleApplyPreset"
+    />
   </div>
 </template>
 
@@ -413,6 +495,63 @@ textarea {
 textarea:focus {
   outline: none;
   border-color: #e53935;
+}
+
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.placeholder-hint {
+  font-family: 'Roboto Slab', serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1565c0;
+}
+
+.placeholder-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.placeholder-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #e3f2fd;
+  border: 2px solid #1565c0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.placeholder-chip:hover {
+  background: #1565c0;
+  transform: translateY(-1px);
+}
+
+.placeholder-chip:hover .ph-key,
+.placeholder-chip:hover .ph-desc {
+  color: #fafafa;
+}
+
+.ph-key {
+  font-family: 'Bangers', cursive;
+  font-size: 11px;
+  color: #1565c0;
+  letter-spacing: 0.5px;
+}
+
+.ph-desc {
+  font-family: 'Roboto Slab', serif;
+  font-size: 10px;
+  font-weight: 600;
+  color: #424242;
 }
 
 @media (max-width: 768px) {

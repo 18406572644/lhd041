@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Zap, Plus, Minus, Info } from 'lucide-vue-next';
-import type { Hero, Power } from '../../types';
+import type { Hero, Power, Preset, PowersPreset } from '../../types';
 import { useHeroStore } from '../../stores/hero';
+import { usePresetsStore } from '../../stores/presets';
 import { useUiStore } from '../../stores/ui';
+import PresetsPanel from './PresetsPanel.vue';
 
 const props = defineProps<{
   hero: Hero;
 }>();
 
 const heroStore = useHeroStore();
+const presetsStore = usePresetsStore();
 const uiStore = useUiStore();
 
 const availablePowers = computed(() => heroStore.powers);
@@ -65,6 +68,25 @@ const totalStats = computed(() => {
   const s = props.hero.stats;
   return s.strength + s.speed + s.intelligence + s.durability + s.combat + s.charisma;
 });
+
+function handleSavePreset(name: string) {
+  try {
+    presetsStore.savePowersPreset(name, props.hero.powers, props.hero.stats, props.hero.weakness);
+    uiStore.showSuccess('能力预设已保存！');
+  } catch (e) {
+    uiStore.showError('保存失败，请重试');
+  }
+}
+
+function handleApplyPreset(preset: Preset) {
+  if (preset.category !== 'powers') return;
+  const powersPreset = preset as PowersPreset;
+  heroStore.updateCurrentHero({
+    powers: powersPreset.data.powers.map(p => ({ ...p })),
+    stats: { ...powersPreset.data.stats },
+    weakness: powersPreset.data.weakness
+  });
+}
 </script>
 
 <template>
@@ -158,6 +180,12 @@ const totalStats = computed(() => {
         </div>
       </div>
     </div>
+
+    <PresetsPanel
+      category="powers"
+      @save="handleSavePreset"
+      @apply="handleApplyPreset"
+    />
   </div>
 </template>
 
